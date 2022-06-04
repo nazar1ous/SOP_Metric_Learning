@@ -19,7 +19,7 @@ class SOPModelArcFace(pl.LightningModule):
         self.batch_size = batch_size
         self.feature_extractor = FeatureExtractor()
         self.model = torch.nn.Sequential(
-            FeatureExtractor(),
+            self.feature_extractor,
             # torch.nn.Linear(self.feature_extractor.last_layer_dim, num_classes)
         )
         self.num_workers = num_workers
