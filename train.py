@@ -1,10 +1,9 @@
-from lightning_models.pl_model import SOPModel
-from lightning_models.pl_model_triplet import SOPModelTriplet
-from lightning_models.pl_model_tuple import SOPModelTuple
-from lightning_models.pl_model_arcface import SOPModelArcFace
+from lightning_models.pl_model import *
+from lightning_models.pl_model_triplet import *
+from lightning_models.pl_model_tuple import *
+from lightning_models.pl_model_arcface import *
 import os
 import wandb
-import pytorch_lightning as pl
 
 
 PROJECT_NAME = "[UCU]-SOP-MetricLearning"
@@ -18,10 +17,12 @@ if __name__ == "__main__":
     params = {
         'root_dir': dataset_path,
         'num_classes': 12,
-        'batch_size': 64,
-        'num_workers': 8
+        'batch_size': 512,
+        'num_workers': 8,
+        'patience': 3,
+        'monitor': 'valid_loss'
     }
-    max_epochs = 100
+    max_epochs = 40
 
     exp_names = ["Vanilla_Cross-Entropy_and_classification_approach",
                  "ArcFace_Loss",
@@ -44,6 +45,6 @@ if __name__ == "__main__":
         )
 
         # Initialize a trainer
-        trainer = pl.Trainer(max_epochs=max_epochs, progress_bar_refresh_rate=20, accelerator="gpu",
+        trainer = pl.Trainer(max_epochs=max_epochs, progress_bar_refresh_rate=20, accelerator="cpu",
                              callbacks=[checkpoint_callback])
         trainer.fit(model)

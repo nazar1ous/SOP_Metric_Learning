@@ -1,4 +1,3 @@
-# pl module
 import pytorch_lightning as pl
 import torch.nn.functional as F
 from torch.utils.data import DataLoader
@@ -7,6 +6,11 @@ import torchmetrics
 import wandb
 from datasets.BasicDataset import SOPBasicDataset
 from datasets.utils import *
+
+
+def get_lr(optimizer):
+    for param_group in optimizer.param_groups:
+        return param_group['lr']
 
 
 class LossWrapper:
@@ -27,19 +31,24 @@ class LossWrapper:
 
 
 class SOPModel(pl.LightningModule):
-    def __init__(self, root_dir, num_classes, batch_size, num_workers):
+    def __init__(self, root_dir, num_classes, batch_size, num_workers,
+                 patience, monitor):
         super().__init__()
         self.num_workers = num_workers
-
-        self.num_classes = num_classes
+        self.patience = patience
+        self.monitor = monitor
         self.root_dir = root_dir
         self.batch_size = batch_size
+
+        self.num_classes = num_classes
+
         self.feature_extractor = FeatureExtractor()
         self.model = torch.nn.Sequential(
             self.feature_extractor,
             torch.nn.Linear(self.feature_extractor.last_layer_dim, num_classes)
         )
 
+        self.criterion = F.cross_entropy
         self.train_loss_w = LossWrapper()
         self.valid_loss_w = LossWrapper()
         self.train_accuracy = torchmetrics.Accuracy(self.num_classes)
@@ -55,6 +64,9 @@ class SOPModel(pl.LightningModule):
             A.HorizontalFlip(p=0.5),
             A.RandomBrightnessContrast(p=0.2),
         ])
+
+        self.optimizer = None
+        self.scheduler = None
 
     def forward(self, x):
         return self.model(x)
@@ -105,7 +117,8 @@ class SOPModel(pl.LightningModule):
     def validation_epoch_end(self, outputs):
         logs = {
             'valid_loss': self.valid_loss_w.get_loss(),
-            'valid_accuracy': self.valid_accuracy.compute()
+            'valid_accuracy': self.valid_accuracy.compute(),
+            'lr': get_lr(self.optimizer)
         }
         if self.use_wandb:
             wandb.log(logs)
@@ -115,10 +128,10 @@ class SOPModel(pl.LightningModule):
         self.valid_accuracy = torchmetrics.Accuracy(self.num_classes)
 
     def configure_optimizers(self):
-        optimizer = torch.optim.Adam(self.parameters(), lr=1e-3)
-        scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer)
-        return {"optimizer": optimizer,
-                "lr_scheduler": scheduler,
+        self.optimizer = torch.optim.Adam(self.parameters(), lr=1e-3)
+        self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(self.optimizer, patience=self.patience)
+        return {"optimizer": self.optimizer,
+                "lr_scheduler": self.scheduler,
                 "monitor": "valid_accuracy"}
 
     def _get_preprocessed_train_valid(self):

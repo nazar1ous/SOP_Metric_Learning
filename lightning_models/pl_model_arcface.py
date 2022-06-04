@@ -8,12 +8,15 @@ import wandb
 from datasets.BasicDataset import SOPBasicDataset
 from datasets.utils import *
 from pytorch_metric_learning import losses
-from lightning_models.pl_model import LossWrapper
+from lightning_models.pl_model import LossWrapper, get_lr, SOPModel
 
 
 class SOPModelArcFace(pl.LightningModule):
-    def __init__(self, root_dir, num_classes, batch_size, num_workers):
+    def __init__(self, root_dir, num_classes, batch_size, num_workers,
+                 patience, monitor):
         super().__init__()
+        self.patience = patience
+        self.monitor = monitor
         self.num_classes = num_classes
         self.root_dir = root_dir
         self.batch_size = batch_size
@@ -41,6 +44,11 @@ class SOPModelArcFace(pl.LightningModule):
             A.HorizontalFlip(p=0.5),
             A.RandomBrightnessContrast(p=0.2),
         ])
+
+        self.optimizer = None
+        self.scheduler = None
+        self.patience = None
+        self.monitor = None
 
     def forward(self, x):
         return self.model(x)
@@ -81,6 +89,8 @@ class SOPModelArcFace(pl.LightningModule):
     def validation_epoch_end(self, outputs):
         logs = {
             'valid_loss': self.valid_loss_w.get_loss(),
+            'lr': get_lr(self.optimizer)
+
         }
         if self.use_wandb:
             wandb.log(logs)
@@ -89,11 +99,11 @@ class SOPModelArcFace(pl.LightningModule):
         self.valid_loss_w.clear()
 
     def configure_optimizers(self):
-        optimizer = torch.optim.Adam(self.parameters(), lr=1e-3)
-        scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer)
-        return {"optimizer": optimizer,
-                "lr_scheduler": scheduler,
-                "monitor": "valid_accuracy"}
+        self.optimizer = torch.optim.Adam(self.parameters(), lr=1e-3)
+        self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(self.optimizer, patience=self.patience)
+        return {"optimizer": self.optimizer,
+                "lr_scheduler": self.scheduler,
+                "monitor": self.monitor}
 
     def _get_preprocessed_train_valid(self):
         self.train_d, self.valid_d = get_datasets(SOPBasicDataset, self.root_dir,
