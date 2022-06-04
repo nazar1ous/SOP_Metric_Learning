@@ -34,6 +34,9 @@ class SOPModel(pl.LightningModule):
     def __init__(self, root_dir, num_classes, batch_size, num_workers,
                  patience, monitor):
         super().__init__()
+        self.save_hyperparameters()
+
+
         self.num_workers = num_workers
         self.patience = patience
         self.monitor = monitor
@@ -67,6 +70,7 @@ class SOPModel(pl.LightningModule):
 
         self.optimizer = None
         self.scheduler = None
+
 
     def forward(self, x):
         return self.model(x)

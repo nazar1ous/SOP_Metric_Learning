@@ -9,6 +9,7 @@ import wandb
 PROJECT_NAME = "[UCU]-SOP-MetricLearning"
 ENTITY_NAME = "my_own"
 dataset_path = "data/Stanford_Online_Products/"
+# dataset_path = "/home/nkusp/Downloads/Stanford_Online_Products (1)/Stanford_Online_Products"
 SAVE_DIR = "checkpoints"
 
 
@@ -22,7 +23,7 @@ if __name__ == "__main__":
         'patience': 3,
         'monitor': 'valid_loss'
     }
-    max_epochs = 40
+    max_epochs = 20
 
     exp_names = ["Vanilla_Cross-Entropy_and_classification_approach",
                  "ArcFace_Loss",
@@ -45,6 +46,6 @@ if __name__ == "__main__":
         )
 
         # Initialize a trainer
-        trainer = pl.Trainer(max_epochs=max_epochs, progress_bar_refresh_rate=20, accelerator="cpu",
+        trainer = pl.Trainer(max_epochs=max_epochs, progress_bar_refresh_rate=20, accelerator="gpu",
                              callbacks=[checkpoint_callback])
         trainer.fit(model)

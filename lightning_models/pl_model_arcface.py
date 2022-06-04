@@ -15,6 +15,8 @@ class SOPModelArcFace(pl.LightningModule):
     def __init__(self, root_dir, num_classes, batch_size, num_workers,
                  patience, monitor):
         super().__init__()
+        self.save_hyperparameters()
+
         self.patience = patience
         self.monitor = monitor
         self.num_classes = num_classes
@@ -47,8 +49,8 @@ class SOPModelArcFace(pl.LightningModule):
 
         self.optimizer = None
         self.scheduler = None
-        self.patience = None
-        self.monitor = None
+        self.patience = patience
+        self.monitor = monitor
 
     def forward(self, x):
         return self.model(x)

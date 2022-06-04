@@ -11,6 +11,8 @@ class SOPModelTriplet(pl.LightningModule):
     def __init__(self, root_dir, num_classes, batch_size, num_workers,
                  patience, monitor):
         super().__init__()
+        self.save_hyperparameters()
+
         self.patience = patience
         self.monitor = monitor
         self.num_classes = num_classes
