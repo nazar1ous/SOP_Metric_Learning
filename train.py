@@ -42,7 +42,7 @@ if __name__ == "__main__":
 
         checkpoint_callback = pl.callbacks.ModelCheckpoint(
             dirpath=os.path.join(SAVE_DIR, exp_name), save_top_k=2, monitor="train_loss",
-            filename="-{epoch:02d}-{train_loss}_{valid_loss}"
+            filename="{epoch:02d}-{train_loss}_{valid_loss}"
         )
 
         # Initialize a trainer
