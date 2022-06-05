@@ -31,15 +31,14 @@ def get_visualizations_classes_map(model, index, valid_dataset, train_dataset, t
     classes_map = {}
     for batch_0 in tqdm.tqdm(valid_dataset):
         idx, img_id, class_id, img, label = batch_0
-        img = img.cuda()
+        batch = torch.Tensor(img[None, :, :, :]).cuda()
 
         super_class_id = np.argmax(label)
         if super_class_id not in classes_map:
-
-            batch = torch.Tensor(img[None, :, :, :])
             with torch.no_grad():
                 vec_emb = model(batch)
-            vec_emb = vec_emb.cpu()[0]
+            vec_emb = vec_emb.cpu()[0].numpy()
+            print(vec_emb.shape)
             closest_paths_pos = get_closest_paths_pos(index, vec_emb, train_dataset, super_class_id, top_K)
             img_path = valid_dataset.data[idx][-1]
             classes_map[super_class_id] = [img_path, closest_paths_pos]
@@ -60,11 +59,11 @@ def plot_visualizations(model, index, valid_dataset, train_dataset, top_K=5, num
         images_rgb = list(map(lambda x: cv.cvtColor(x, cv.COLOR_BGR2RGB),
                               [cv.imread(img_p) for img_p in images_paths]))
 
-        images_bordered = [cv.copyMakeBorder(images_rgb[0],20,20,20,20,cv.BORDER_CONSTANT,value=black)]
+        images_bordered = [cv.copyMakeBorder(images_rgb[0], 20, 20, 20, 20, cv.BORDER_CONSTANT, value=black)]
         for i, image_rgb in enumerate(images_rgb[1:]):
             is_pos = data[i][1]
             if is_pos:
-                img_tr = cv.copyMakeBorder(image_rgb,20,20,20,20,cv.BORDER_CONSTANT,value=green)
+                img_tr = cv.copyMakeBorder(image_rgb, 20, 20, 20, 20, cv.BORDER_CONSTANT, value=green)
             else:
                 img_tr = cv.copyMakeBorder(image_rgb, 20, 20, 20, 20, cv.BORDER_CONSTANT, value=red)
             images_bordered.append(img_tr)
@@ -86,7 +85,8 @@ def plot_visualizations(model, index, valid_dataset, train_dataset, top_K=5, num
 
 
 def get_closest_paths_pos(index, vector_emb, train_dataset, emb_class_idx, top_K=5):
-    n_closest = index.get_nns_by_vector(torch.transpose(vector_emb, 0, 1),
+    # v = torch.transpose(vector_emb, 0, 1)
+    n_closest = index.get_nns_by_vector(vector_emb,
                                         top_K, search_k=-1, include_distances=False)
     closest_paths_pos = []
 
@@ -101,7 +101,7 @@ def get_closest_paths_pos(index, vector_emb, train_dataset, emb_class_idx, top_K
 
 
 def get_class(index, vector_emb, train_dataset, top_K=5):
-    n_closest = index.get_nns_by_vector(torch.transpose(vector_emb, 0, 1),
+    n_closest = index.get_nns_by_vector(vector_emb,
                                         top_K, search_k=-1, include_distances=False)
     classes_counter = np.zeros(train_dataset.num_classes)
     super_classes_counter = np.zeros(train_dataset.num_super_classes)
@@ -121,12 +121,14 @@ def get_class(index, vector_emb, train_dataset, top_K=5):
 
 
 def get_precision(labels, pred_labels):
-    result = metrics.classification_report(labels, pred_labels, digits=3, output_dict=True)
+    result = metrics.classification_report(labels, pred_labels, digits=3, output_dict=True,
+                                           zero_division=True)
     return result['macro avg'].get('precision')
 
 
 def get_summary(labels, pred_labels):
-    result = metrics.classification_report(labels, pred_labels, digits=3, output_dict=True)
+    result = metrics.classification_report(labels, pred_labels, digits=3, output_dict=True,
+                                           zero_division=True)
     els = ['precision', 'recall', 'f1-score']
     dct1 = {el: result['macro avg'].get(el) for el in els}
     dct1.update(
@@ -149,14 +151,14 @@ def test_abstract(model, index, train_dataset, valid_dataloader, dataset_len=100
         idxs, img_ids, class_ids, imgs, labels = batch_0
         imgs = imgs.cuda()
 
-        super_class_ids = np.argmax(labels)
-
         with torch.no_grad():
             vec_embs = model(imgs)
         vec_embs = vec_embs.cpu()
-        for img_id, class_id, vec_emb, super_class_id in zip(img_ids, class_ids, vec_embs, super_class_ids):
-            pred_class_id, pred_super_class_id,\
-                pred_classes_k, pred_super_classes_k = get_class(index, vec_emb, train_dataset, top_K=top_K)
+        for img_id, class_id, vec_emb, label in zip(img_ids, class_ids, vec_embs, labels):
+            super_class_id = np.argmax(label)
+
+            pred_class_id, pred_super_class_id, \
+            pred_classes_k, pred_super_classes_k = get_class(index, vec_emb, train_dataset, top_K=top_K)
             label_lst_classes = [class_id] * len(pred_classes_k)
             label_lst_super_classes = [super_class_id] * len(pred_super_classes_k)
             p_k_classes = get_precision(label_lst_classes, pred_classes_k)
@@ -171,7 +173,7 @@ def test_abstract(model, index, train_dataset, valid_dataloader, dataset_len=100
             pred_classes.append(pred_class_id)
 
     print("Classes ", get_summary(classes, pred_classes))
-    print("Super classes ", get_summary(super_classes, pred_super_classes))
+    # print("Super classes ", get_summary(super_classes, pred_super_classes))
 
     print(f"Classes MAP@{top_K} = {map_k_classes / dataset_len}")
     print(f"Super Classes MAP@{top_K} = {map_k_super_classes / dataset_len}")
@@ -186,8 +188,8 @@ def test(my_lightning_module, model_checkpoint, dataset_path, index_path, top_K=
     index = AnnoyIndex(model.last_layer_dim, 'angular')
     index.load(index_path)
 
-    test_abstract(model, index, train_d, validation_loader, len(valid_d), top_K)
     plot_visualizations(model, index, valid_d, train_d, top_K=5, save_path=save_visual_path)
+    test_abstract(model, index, train_d, validation_loader, len(valid_d), top_K)
 
 
 if __name__ == "__main__":
@@ -197,17 +199,17 @@ if __name__ == "__main__":
 
     path_to_index_folder = "index_tree"
     dataset_path = "data/Stanford_Online_Products/"
-    run_name = "Siamese_approach_and_Contrastive_Loss"
+    run_name = "Triplet_Loss"
     checkpoint_name = os.listdir(os.path.join(path_to_checkpoints, run_name))[0]
 
     # dataset_path = "/home/nkusp/Downloads/Stanford_Online_Products (1)/Stanford_Online_Products/"
 
     # train_d, valid_d = get_datasets(SOPBasicDataset, dataset_path,
     #                                 mode="train")
-    index_path = f'{os.path.join(visualizations_path, run_name)}.ann'
+    index_path = f'{os.path.join(path_to_index_folder, run_name)}.ann'
     visualizations_path = os.path.join(visualizations_path, run_name)
-    test(SOPModelTuple, os.path.join(path_to_checkpoints, run_name, checkpoint_name),
-                         dataset_path, index_path, save_visual_path=visualizations_path)
+    test(SOPModelTriplet, os.path.join(path_to_checkpoints, run_name, checkpoint_name),
+         dataset_path, index_path, save_visual_path=visualizations_path)
 
     #
     # model = FeatureExtractor()

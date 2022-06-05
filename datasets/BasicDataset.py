@@ -30,9 +30,7 @@ class SOPBasicDataset(Dataset):
             A.HorizontalFlip(p=0.5),
             A.RandomBrightnessContrast(p=0.2),
         ])
-        # self.data = self.data[:10]
         self.map_ = {self.data[i][0]: i for i in range(len(self.data))}
-
 
     def __getitem__(self, idx):
         img_id, class_id, super_class_id, img_path = self.data[idx]
@@ -45,16 +43,9 @@ class SOPBasicDataset(Dataset):
         img = self.norm(img)
         label = np.zeros(self.num_super_classes)
         label[super_class_id] = 1
+
         return idx, img_id, class_id, img, label
 
     def __len__(self):
         return len(self.data)
 
-
-if __name__ == "__main__":
-    dataset_path = "/home/nkusp/Downloads/Stanford_Online_Products (1)/Stanford_Online_Products/"
-    train, valid = get_datasets(SOPBasicDataset, dataset_path)
-
-    for batch in train:
-        print(batch)
-        ff

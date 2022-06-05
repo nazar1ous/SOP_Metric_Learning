@@ -19,6 +19,7 @@ random.seed(251)
 
 def save_index(model, dataloader, save_path):
     table = AnnoyIndex(model.last_layer_dim, 'angular')
+    model.cuda()
 
     for _, img_id, class_id, img, label in tqdm.tqdm(dataloader):
         img = img.cuda()
