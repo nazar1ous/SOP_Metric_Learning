@@ -17,13 +17,16 @@ def get_feature_extractor(MyLightningModule, checkpoint_path):
 random.seed(251)
 
 
-def save_index(model, dataset, save_path):
+def save_index(model, dataloader, save_path):
     table = AnnoyIndex(model.last_layer_dim, 'angular')
 
-    for idx, img_id, class_id, img, label in tqdm.tqdm(dataset):
-        batch = img[None, :, :, :]
-        vector = model(batch)[0]
-        table.add_item(i=img_id, vector=vector)
+    for _, img_id, class_id, img, label in tqdm.tqdm(dataloader):
+        img = img.cuda()
+        with torch.no_grad():
+            vectors = model(img)
+        vectors = vectors.cpu()
+        for vector, img_id_ in zip(vectors, img_id):
+            table.add_item(i=img_id_, vector=vector)
 
     table.build(n_trees=500)
 
@@ -34,7 +37,9 @@ def save_index_lightning(my_lightning_module, model_checkpoint, dataset_path, in
     model = get_feature_extractor(my_lightning_module, model_checkpoint)
     train_d, valid_d = get_datasets(SOPBasicDataset, dataset_path,
                                     mode="train")
-    save_index(model, train_d, index_save_path)
+    train_loader = DataLoader(train_d, batch_size=128)
+
+    save_index(model, train_loader, index_save_path)
 
 
 if __name__ == "__main__":
@@ -48,8 +53,8 @@ if __name__ == "__main__":
     # dataset_path = "/home/nkusp/Downloads/Stanford_Online_Products (1)/Stanford_Online_Products/"
     set_seed_cuda(251)
 
-    train_d, valid_d = get_datasets(SOPBasicDataset, dataset_path,
-                                              mode="train")
+    # train_d, valid_d = get_datasets(SOPBasicDataset, dataset_path,
+    #                                           mode="train")
     save_path = f'{os.path.join(path_to_index_folder, run_name)}.ann'
     path_to_checkpoints = "checkpoints"
     checkpoint_name = os.listdir(os.path.join(path_to_checkpoints, run_name))[0]
