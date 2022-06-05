@@ -8,8 +8,8 @@ import wandb
 
 PROJECT_NAME = "[UCU]-SOP-MetricLearning"
 ENTITY_NAME = "my_own"
-dataset_path = "data/Stanford_Online_Products/"
-# dataset_path = "/home/nkusp/Downloads/Stanford_Online_Products (1)/Stanford_Online_Products"
+# dataset_path = "data/Stanford_Online_Products/"
+dataset_path = "/home/nkusp/Downloads/Stanford_Online_Products (1)/Stanford_Online_Products"
 SAVE_DIR = "checkpoints"
 
 
@@ -18,8 +18,8 @@ if __name__ == "__main__":
     params = {
         'root_dir': dataset_path,
         'num_classes': 12,
-        'batch_size': 512,
-        'num_workers': 8,
+        'batch_size': 4,
+        'num_workers': 4,
         'patience': 3,
         'monitor': 'valid_loss'
     }

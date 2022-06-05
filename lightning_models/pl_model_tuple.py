@@ -47,7 +47,7 @@ class SOPModelTuple(pl.LightningModule):
             A.RandomBrightnessContrast(p=0.2),
         ], additional_targets={'neg_img': 'image', 'pos_img': 'image'})
 
-        self.margin = 0.9
+        self.margin = 0.5
         self.optimizer = None
         self.scheduler = None
 
@@ -57,7 +57,7 @@ class SOPModelTuple(pl.LightningModule):
     def training_step(self, batch, batch_idx):
         idx, anc_img, pos, neg = batch
         target = neg
-        rand = int(rd.random())
+        rand = int(rd.random() > 0.5)
         if rand:
             target = pos
         v1, v2 = self.model(anc_img), self.model(target)
