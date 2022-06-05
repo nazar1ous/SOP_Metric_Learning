@@ -31,6 +31,7 @@ def get_visualizations_classes_map(model, index, valid_dataset, train_dataset, t
     classes_map = {}
     for batch_0 in tqdm.tqdm(valid_dataset):
         idx, img_id, class_id, img, label = batch_0
+        img = img.cuda()
 
         super_class_id = np.argmax(label)
         if super_class_id not in classes_map:
@@ -38,7 +39,7 @@ def get_visualizations_classes_map(model, index, valid_dataset, train_dataset, t
             batch = torch.Tensor(img[None, :, :, :])
             with torch.no_grad():
                 vec_emb = model(batch)
-            vec_emb = vec_emb.cpu()
+            vec_emb = vec_emb.cpu()[0]
             closest_paths_pos = get_closest_paths_pos(index, vec_emb, train_dataset, super_class_id, top_K)
             img_path = valid_dataset.data[idx][-1]
             classes_map[super_class_id] = [img_path, closest_paths_pos]
@@ -134,8 +135,7 @@ def get_summary(labels, pred_labels):
     return dct1
 
 
-def test_abstract(model, index, train_d, valid_d, top_K=5):
-    model.cuda()
+def test_abstract(model, index, train_dataset, valid_dataloader, dataset_len=1000, top_K=5):
     classes = []
     super_classes = []
     pred_classes = []
@@ -143,47 +143,50 @@ def test_abstract(model, index, train_d, valid_d, top_K=5):
 
     map_k_classes = 0.0
     map_k_super_classes = 0.0
+    model.cuda()
 
-    for batch_0 in tqdm.tqdm(valid_d):
-        idx, img_id, class_id, img, label = batch_0
+    for batch_0 in tqdm.tqdm(valid_dataloader):
+        idxs, img_ids, class_ids, imgs, labels = batch_0
+        imgs = imgs.cuda()
 
-        super_class_id = np.argmax(label)
+        super_class_ids = np.argmax(labels)
 
-        batch = torch.Tensor(img[None, :, :, :])
         with torch.no_grad():
-            vec_emb = model(batch)
-        vec_emb = vec_emb.cpu()
+            vec_embs = model(imgs)
+        vec_embs = vec_embs.cpu()
+        for img_id, class_id, vec_emb, super_class_id in zip(img_ids, class_ids, vec_embs, super_class_ids):
+            pred_class_id, pred_super_class_id,\
+                pred_classes_k, pred_super_classes_k = get_class(index, vec_emb, train_dataset, top_K=top_K)
+            label_lst_classes = [class_id] * len(pred_classes_k)
+            label_lst_super_classes = [super_class_id] * len(pred_super_classes_k)
+            p_k_classes = get_precision(label_lst_classes, pred_classes_k)
+            p_k_super_classes = get_precision(label_lst_super_classes, pred_super_classes_k)
 
-        pred_class_id, pred_super_class_id,\
-            pred_classes_k, pred_super_classes_k = get_class(index, vec_emb, train_d, top_K=top_K)
-        label_lst_classes = [class_id] * len(pred_classes_k)
-        label_lst_super_classes = [super_class_id] * len(pred_super_classes_k)
-        p_k_classes = get_precision(label_lst_classes, pred_classes_k)
-        p_k_super_classes = get_precision(label_lst_super_classes, pred_super_classes_k)
+            map_k_classes += p_k_classes
+            map_k_super_classes += p_k_super_classes
 
-        map_k_classes += p_k_classes
-        map_k_super_classes += p_k_super_classes
-
-        super_classes.append(super_class_id)
-        classes.append(class_id)
-        pred_super_classes.append(pred_super_class_id)
-        pred_classes.append(pred_class_id)
+            super_classes.append(super_class_id)
+            classes.append(class_id)
+            pred_super_classes.append(pred_super_class_id)
+            pred_classes.append(pred_class_id)
 
     print("Classes ", get_summary(classes, pred_classes))
     print("Super classes ", get_summary(super_classes, pred_super_classes))
 
-    print(f"Classes MAP@{top_K} = {map_k_classes / len(valid_d)}")
-    print(f"Super Classes MAP@{top_K} = {map_k_super_classes / len(valid_d)}")
+    print(f"Classes MAP@{top_K} = {map_k_classes / dataset_len}")
+    print(f"Super Classes MAP@{top_K} = {map_k_super_classes / dataset_len}")
 
 
 def test(my_lightning_module, model_checkpoint, dataset_path, index_path, top_K=5, save_visual_path=""):
     model = get_feature_extractor(my_lightning_module, model_checkpoint)
     train_d, valid_d = get_datasets(SOPBasicDataset, dataset_path,
                                     mode="train")
+    validation_loader = DataLoader(valid_d, batch_size=128)
+
     index = AnnoyIndex(model.last_layer_dim, 'angular')
     index.load(index_path)
 
-    test_abstract(model, index, train_d, valid_d, top_K)
+    test_abstract(model, index, train_d, validation_loader, len(valid_d), top_K)
     plot_visualizations(model, index, valid_d, train_d, top_K=5, save_path=save_visual_path)
 
 
@@ -199,8 +202,8 @@ if __name__ == "__main__":
 
     # dataset_path = "/home/nkusp/Downloads/Stanford_Online_Products (1)/Stanford_Online_Products/"
 
-    train_d, valid_d = get_datasets(SOPBasicDataset, dataset_path,
-                                    mode="train")
+    # train_d, valid_d = get_datasets(SOPBasicDataset, dataset_path,
+    #                                 mode="train")
     index_path = f'{os.path.join(visualizations_path, run_name)}.ann'
     visualizations_path = os.path.join(visualizations_path, run_name)
     test(SOPModelTuple, os.path.join(path_to_checkpoints, run_name, checkpoint_name),
