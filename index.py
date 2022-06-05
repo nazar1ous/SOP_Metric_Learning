@@ -1,15 +1,12 @@
 from annoy import AnnoyIndex
 import tqdm
-from datasets.utils import *
-from datasets.BasicDataset import SOPBasicDataset
-from models.base_encoder import FeatureExtractor
+
 import random
 
 from lightning_models.pl_model import *
 from lightning_models.pl_model_triplet import *
 from lightning_models.pl_model_tuple import *
 from lightning_models.pl_model_arcface import *
-from sklearn import metrics
 
 
 def get_feature_extractor(MyLightningModule, checkpoint_path):
@@ -50,8 +47,6 @@ if __name__ == "__main__":
 
     # dataset_path = "/home/nkusp/Downloads/Stanford_Online_Products (1)/Stanford_Online_Products/"
     set_seed_cuda(251)
-    os.chdir("..")
-
 
     train_d, valid_d = get_datasets(SOPBasicDataset, dataset_path,
                                               mode="train")

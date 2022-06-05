@@ -195,7 +195,6 @@ if __name__ == "__main__":
     path_to_index_folder = "index_tree"
     dataset_path = "data/Stanford_Online_Products/"
     run_name = "Siamese_approach_and_Contrastive_Loss"
-    os.chdir("..")
     checkpoint_name = os.listdir(os.path.join(path_to_checkpoints, run_name))[0]
 
     # dataset_path = "/home/nkusp/Downloads/Stanford_Online_Products (1)/Stanford_Online_Products/"
